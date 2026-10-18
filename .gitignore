@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 highscore.json
 .test_scratch/
+.DS_Store
