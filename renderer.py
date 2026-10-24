@@ -68,6 +68,14 @@ BUTTONS = {
 }
 
 
+def _fade_to_bg(color: Tuple[int, int, int], ratio: float) -> Tuple[int, int, int]:
+    return (
+        int(BG_COLOR[0] + (color[0] - BG_COLOR[0]) * ratio),
+        int(BG_COLOR[1] + (color[1] - BG_COLOR[1]) * ratio),
+        int(BG_COLOR[2] + (color[2] - BG_COLOR[2]) * ratio),
+    )
+
+
 class SoundManager:
     """Generates procedural sine wave audio blips without external asset files."""
 
@@ -267,19 +275,16 @@ class Renderer:
 
     def _update_fx(self, dt: float) -> None:
         """Advance visual effects lifetimes and particle physics."""
-        for r in self.rings:
-            r["age"] += dt
+        for item in self.rings + self.popups:
+            item["age"] += dt
         self.rings = [r for r in self.rings if r["age"] < r["duration"]]
+        self.popups = [pop for pop in self.popups if pop["age"] < pop["duration"]]
 
         for p in self.particles_fx:
             p["age"] += dt
             p["x"] += p["vx"] * dt
             p["y"] += p["vy"] * dt
         self.particles_fx = [p for p in self.particles_fx if p["age"] < p["duration"]]
-
-        for pop in self.popups:
-            pop["age"] += dt
-        self.popups = [pop for pop in self.popups if pop["age"] < pop["duration"]]
 
     def render(self, game: Game, mouse_pos: Tuple[int, int], dt: float) -> None:
         """Render current game state based on active game mode."""
@@ -497,12 +502,7 @@ class Renderer:
             t = d.age
             if t >= DEBRIS_DURATION:
                 continue
-            fade = max(0.0, 1.0 - (t / DEBRIS_DURATION))
-            color = (
-                int(BG_COLOR[0] + (CRUMBLE_COLOR[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (CRUMBLE_COLOR[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (CRUMBLE_COLOR[2] - BG_COLOR[2]) * fade),
-            )
+            color = _fade_to_bg(CRUMBLE_COLOR, max(0.0, 1.0 - (t / DEBRIS_DURATION)))
             drop_y = int(0.5 * 1400.0 * (t ** 2))
             screen_y = int(d.rect.top - game.camera_y) + drop_y
             if screen_y > HEIGHT + 40 or screen_y < -50:
@@ -571,66 +571,39 @@ class Renderer:
 
     def _render_effects(self, camera_y: float) -> None:
         """Render visual effect rings, burst particles, and rising text popups."""
-        # Draw expanding rings
         for r in self.rings:
             progress = r["age"] / r["duration"]
             radius = int(r["radius_start"] + progress * (r["radius_end"] - r["radius_start"]))
-            fade = max(0.0, 1.0 - progress)
-            base_c = r["color"]
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * fade),
-            )
+            c = _fade_to_bg(r["color"], max(0.0, 1.0 - progress))
             screen_y = int(r["y"] - camera_y)
             if -50 <= screen_y <= HEIGHT + 50:
                 pygame.draw.circle(self.screen, c, (int(r["x"]), screen_y), radius, width=2)
 
-        # Draw burst particles
         for p in self.particles_fx:
             progress = p["age"] / p["duration"]
-            fade = max(0.0, 1.0 - progress)
-            base_c = p["color"]
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * fade),
-            )
+            c = _fade_to_bg(p["color"], max(0.0, 1.0 - progress))
             cur_size = max(1, int(p["size"] * (1.0 - progress * 0.5)))
             screen_y = int(p["y"] - camera_y)
             if -20 <= screen_y <= HEIGHT + 20:
                 pygame.draw.circle(self.screen, c, (int(p["x"]), screen_y), cur_size)
 
-        # Draw popups
         for pop in self.popups:
             progress = pop["age"] / pop["duration"]
-            fade = max(0.0, 1.0 - progress)
             rise = 40.0 * (1.0 - (1.0 - progress) ** 2)
             screen_y = int(pop["y"] - camera_y - rise)
             if screen_y < -50 or screen_y > HEIGHT + 50:
                 continue
 
-            base_c = pop["base_color"]
-            fade_step = int(fade * 10)
-            ratio = fade_step / 10.0
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * ratio),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * ratio),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * ratio),
-            )
-
-            size = "small"
-            if pop["is_near_miss"]:
-                size = "large" if pop["age"] < 0.12 else "medium"
-
+            fade = max(0.0, 1.0 - progress)
+            c = _fade_to_bg(pop["base_color"], int(fade * 10) / 10.0)
+            size = ("large" if pop["age"] < 0.12 else "medium") if pop["is_near_miss"] else "small"
             key = (pop["text"], c, size)
             if key not in self.text_cache:
                 font = self.font_score if size == "large" else (self.font_medium if size == "medium" else self.font_small)
                 self.text_cache[key] = font.render(pop["text"], True, c)
 
             surf = self.text_cache[key]
-            rect = surf.get_rect(center=(int(pop["x"]), screen_y))
-            self.screen.blit(surf, rect)
+            self.screen.blit(surf, surf.get_rect(center=(int(pop["x"]), screen_y)))
 
     def _render_player(self, game: Game) -> None:
         """Render character with landing squash and ascending stretch animations."""
