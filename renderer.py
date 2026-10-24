@@ -138,20 +138,7 @@ class SoundManager:
     def _make_sine_wave(
         self, freq: float, duration: float, volume: float, sample_rate: int, channels: int
     ) -> Optional[pygame.mixer.Sound]:
-        try:
-            num_samples = int(sample_rate * duration)
-            buffer = bytearray()
-            for i in range(num_samples):
-                t = i / sample_rate
-                # Exponential decay envelope
-                envelope = math.exp(-3.5 * t / duration)
-                sample = int(volume * 32767.0 * envelope * math.sin(2.0 * math.pi * freq * t))
-                sample_bytes = int(sample).to_bytes(2, byteorder="little", signed=True)
-                # Write sample once per channel (e.g. duplicate for stereo)
-                buffer += sample_bytes * channels
-            return pygame.mixer.Sound(buffer=bytes(buffer))
-        except Exception:
-            return None
+        return self._make_tones([(freq, duration)], volume, sample_rate, channels)
 
     def _make_tones(
         self, notes: List[Tuple[float, float]], volume: float, sample_rate: int, channels: int
@@ -171,41 +158,27 @@ class SoundManager:
         except Exception:
             return None
 
-    def play_jump(self) -> None:
-        if self.available and self.jump_sound:
+    def _play(self, sound: Optional[pygame.mixer.Sound]) -> None:
+        if self.available and sound:
             try:
-                self.jump_sound.play()
+                sound.play()
             except Exception:
                 pass
+
+    def play_jump(self) -> None:
+        self._play(self.jump_sound)
 
     def play_pad(self) -> None:
-        if self.available and self.pad_sound:
-            try:
-                self.pad_sound.play()
-            except Exception:
-                pass
+        self._play(self.pad_sound)
 
     def play_game_over(self) -> None:
-        if self.available and self.game_over_sound:
-            try:
-                self.game_over_sound.play()
-            except Exception:
-                pass
+        self._play(self.game_over_sound)
 
     def play_orb(self, risk: bool = False) -> None:
-        try:
-            snd = self.risk_orb_sound if risk else self.orb_sound
-            if self.available and snd:
-                snd.play()
-        except Exception:
-            pass
+        self._play(self.risk_orb_sound if risk else self.orb_sound)
 
     def play_near_miss(self) -> None:
-        try:
-            if self.available and self.near_miss_sound:
-                self.near_miss_sound.play()
-        except Exception:
-            pass
+        self._play(self.near_miss_sound)
 
 
 class Renderer:

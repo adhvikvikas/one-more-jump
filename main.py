@@ -44,10 +44,8 @@ def main() -> None:
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if game.state == "playing":
-                        game.pause()
-                    elif game.state == "paused":
-                        game.resume()
+                    if game.state in ("playing", "paused"):
+                        game.toggle_pause()
                     elif game.state == "menu":
                         game.save_if_best()
                         running = False

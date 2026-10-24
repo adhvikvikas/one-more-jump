@@ -285,6 +285,13 @@ class Game:
                 return False
         return True
 
+    def _make_start_platform(self) -> Platform:
+        """Construct the initial safe platform positioned directly under the player."""
+        start_plat_width = 140
+        start_plat_x = (WIDTH - start_plat_width) // 2
+        start_plat_y = int(START_Y + PLAYER_SIZE + 2)
+        return Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+
     def start_run(self) -> None:
         """Initialize a new game run with reset physics, camera, and stack."""
         self.run_id += 1
@@ -309,8 +316,6 @@ class Game:
         self.hazards.clear()
         self.invuln_timer = 0.0
         self.platforms_since_hazard = 0
-        if not hasattr(self, "hazards_enabled"):
-            self.hazards_enabled = True
 
         self.pads.clear()
         self.crumblers.clear()
@@ -318,22 +323,15 @@ class Game:
         self.platforms_since_pad = 999
         self.platforms_since_crumbler = 999
         self.consecutive_special_run = 0
-        if not hasattr(self, "specials_enabled"):
-            self.specials_enabled = True
 
         self.orbs.clear()
         self.events.clear()
-        if not hasattr(self, "orbs_enabled"):
-            self.orbs_enabled = True
         self.last_landing_platform = None
 
         self.checkpoint_stack.clear()
 
         # Seed initial safe platform directly under the player
-        start_plat_width = 140
-        start_plat_x = (WIDTH - start_plat_width) // 2
-        start_plat_y = int(START_Y + PLAYER_SIZE + 2)
-        start_plat = Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+        start_plat = self._make_start_platform()
 
         self.platforms = [start_plat]
         self.last_safe_platform = start_plat
@@ -606,10 +604,7 @@ class Game:
             candidates = [p for p in self.platforms if p.top < self.camera_y + HEIGHT]
             cp_platform = max(candidates, key=lambda p: p.top) if candidates else self.platforms[0]
         else:
-            start_plat_width = 140
-            start_plat_x = (WIDTH - start_plat_width) // 2
-            start_plat_y = int(START_Y + PLAYER_SIZE + 2)
-            cp_platform = Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+            cp_platform = self._make_start_platform()
 
         # a. Ensure checkpoint platform exists in platforms list (re-append if culled)
         if cp_platform not in self.platforms:
