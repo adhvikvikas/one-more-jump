@@ -58,33 +58,14 @@ from settings import (
 )
 
 # --- Button Layout Geometry (Shared with main.py for hit-testing) ---
-
-def get_menu_play_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 400, 220, 52)
-
-
-def get_hud_pause_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 44) // 2, 14, 44, 32)
-
-
-def get_pause_resume_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 280, 200, 50)
-
-
-def get_pause_restart_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 348, 200, 50)
-
-
-def get_pause_menu_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 416, 200, 50)
-
-
-def get_game_over_restart_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 400, 220, 52)
-
-
-def get_game_over_menu_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 468, 220, 52)
+BUTTONS = {
+    "play": pygame.Rect((WIDTH - 220) // 2, 400, 220, 52),
+    "pause": pygame.Rect((WIDTH - 44) // 2, 14, 44, 32),
+    "resume": pygame.Rect((WIDTH - 200) // 2, 280, 200, 50),
+    "restart": pygame.Rect((WIDTH - 200) // 2, 348, 200, 50),
+    "menu": pygame.Rect((WIDTH - 200) // 2, 416, 200, 50),
+    "go_menu": pygame.Rect((WIDTH - 220) // 2, 468, 220, 52),
+}
 
 
 class SoundManager:
@@ -110,28 +91,17 @@ class SoundManager:
                 self.available = False
                 return
 
-            self.jump_sound = self._make_sine_wave(
-                freq=587.33, duration=0.07, volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.pad_sound = self._make_sine_wave(
-                freq=880.0, duration=0.10, volume=0.25, sample_rate=freq, channels=channels
-            )
-            self.game_over_sound = self._make_sine_wave(
-                freq=174.61, duration=0.35, volume=0.28, sample_rate=freq, channels=channels
-            )
-            self.orb_sound = self._make_tones(
-                [(988.0, 0.06), (1319.0, 0.09)], volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.risk_orb_sound = self._make_tones(
-                [(988.0, 0.06), (1319.0, 0.06), (1760.0, 0.10)], volume=0.24, sample_rate=freq, channels=channels
-            )
-            self.near_miss_sound = self._make_tones(
-                [(523.25, 0.05), (783.99, 0.05), (1046.50, 0.08)], volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.available = bool(
-                self.jump_sound and self.pad_sound and self.game_over_sound
-                and self.orb_sound and self.risk_orb_sound and self.near_miss_sound
-            )
+            sound_defs = {
+                "jump_sound": ([(587.33, 0.07)], 0.22),
+                "pad_sound": ([(880.0, 0.10)], 0.25),
+                "game_over_sound": ([(174.61, 0.35)], 0.28),
+                "orb_sound": ([(988.0, 0.06), (1319.0, 0.09)], 0.22),
+                "risk_orb_sound": ([(988.0, 0.06), (1319.0, 0.06), (1760.0, 0.10)], 0.24),
+                "near_miss_sound": ([(523.25, 0.05), (783.99, 0.05), (1046.50, 0.08)], 0.22),
+            }
+            for attr, (notes, vol) in sound_defs.items():
+                setattr(self, attr, self._make_tones(notes, vol, freq, channels))
+            self.available = all(getattr(self, attr) is not None for attr in sound_defs)
         except Exception:
             self.available = False
 
@@ -736,9 +706,8 @@ class Renderer:
         self.screen.blit(best_label, (WIDTH - best_label.get_width() - 20, 20))
 
         # Top-center Pause Button
-        pause_btn = get_hud_pause_button_rect()
-        hovered = pause_btn.collidepoint(mouse_pos)
-        self.draw_button(self.screen, pause_btn, "||", hovered)
+        pause_btn = BUTTONS["pause"]
+        self.draw_button(self.screen, pause_btn, "||", pause_btn.collidepoint(mouse_pos))
 
         # Checkpoint Rewind Indicator (Second Chance Pips)
         pips_y = HEIGHT - 28
@@ -772,7 +741,7 @@ class Renderer:
         self.screen.blit(best_surf, best_rect)
 
         # Play Button
-        play_btn = get_menu_play_button_rect()
+        play_btn = BUTTONS["play"]
         self.draw_button(self.screen, play_btn, "PLAY", play_btn.collidepoint(mouse_pos))
 
         # Controls Guide
@@ -790,13 +759,9 @@ class Renderer:
         title = self.font_title.render("PAUSED", True, TEXT_COLOR)
         self.screen.blit(title, title.get_rect(center=(WIDTH // 2, 210)))
 
-        resume_btn = get_pause_resume_button_rect()
-        restart_btn = get_pause_restart_button_rect()
-        menu_btn = get_pause_menu_button_rect()
-
-        self.draw_button(self.screen, resume_btn, "RESUME", resume_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, restart_btn, "RESTART", restart_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, menu_btn, "MENU", menu_btn.collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["resume"], "RESUME", BUTTONS["resume"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["restart"], "RESTART", BUTTONS["restart"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["menu"], "MENU", BUTTONS["menu"].collidepoint(mouse_pos))
 
     def _render_game_over(self, game: Game, mouse_pos: Tuple[int, int]) -> None:
         """Render game over screen with scores, new best highlight, and buttons."""
@@ -817,8 +782,5 @@ class Renderer:
             best_text = self.font_medium.render(f"BEST: {game.best_score}", True, TEXT_MUTED)
         self.screen.blit(best_text, best_text.get_rect(center=(WIDTH // 2, 312)))
 
-        restart_btn = get_game_over_restart_button_rect()
-        menu_btn = get_game_over_menu_button_rect()
-
-        self.draw_button(self.screen, restart_btn, "PLAY AGAIN", restart_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, menu_btn, "MENU", menu_btn.collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["play"], "PLAY AGAIN", BUTTONS["play"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["go_menu"], "MENU", BUTTONS["go_menu"].collidepoint(mouse_pos))
