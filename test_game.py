@@ -47,6 +47,8 @@ from settings import (
     CRUMBLE_START_SCORE,
     DEBRIS_DURATION,
     DIFFICULTY_RAMP_SCORE,
+    GAP_FINAL_MAX,
+    GRAVITY,
     HEIGHT,
     JUMP_HEIGHT,
     JUMP_VELOCITY,
@@ -169,6 +171,7 @@ def test_reachability() -> None:
 
     clamped_pct = (clamped_count / total_pairs) * 100.0
     assert clamped_pct <= 5.0
+    assert GAP_FINAL_MAX <= MAX_GAP_LIMIT
 
     g0 = make_game(score=0, hazards=False, specials=False, orbs=False)
     climb(g0, 500, step=1000.0)
@@ -221,6 +224,13 @@ def test_collision() -> None:
     game.player_vy = 300.0
     game.update(dt=0.03, move_dir=0)
     assert game.player_vy > 0.0
+
+    # Zero vertical velocity at platform top does not land
+    game.player_x = 120.0
+    game.player_y = float(test_plat.top - PLAYER_SIZE)
+    game.player_vy = -GRAVITY * 0.016
+    game.update(dt=0.016, move_dir=0)
+    assert game.player_vy == 0.0 and not game.just_jumped
 
     print("✓ Test 3 Passed: Collision physics verified.")
 
@@ -614,6 +624,7 @@ def test_crumbler_mechanics_and_checkpoint_safety() -> None:
     game.player_vy = 300.0
     game.update(0.016, 0)
     assert crumbler.state == "crumbling" and crumbler.timer == CRUMBLE_DELAY
+    assert game.checkpoint_stack.is_empty()
 
     # Re-landing does not reset
     t_before = crumbler.timer
@@ -643,6 +654,10 @@ def test_crumbler_mechanics_and_checkpoint_safety() -> None:
     game.player_vy = 300.0
     game.update(0.016, 0)
     assert game.player_vy > 300.0
+
+    # Rewind restores crumbler to intact
+    game._rewind()
+    assert crumbler.state == "intact"
 
     # Plain platforms only checkpoints
     random.seed(42)
@@ -883,9 +898,19 @@ def test_near_miss() -> None:
     game, spike_f, hb = make_nm_game(invuln=1.0)
     game.player_x, game.player_y = hb.right + 2, hb.top
     game.update(0.016, 0)
+    assert not spike_f.in_zone
     game.player_x = hb.right + 50
     game.update(0.016, 0)
     assert not spike_f.in_zone and game.bonus_score == 0
+
+    game, spike_f2, hb = make_nm_game()
+    game.player_x, game.player_y = hb.right + 2, hb.top
+    game.update(0.016, 0)
+    assert spike_f2.in_zone is True
+    game.invuln_timer = 1.0
+    game.player_x = hb.right + 50
+    game.update(0.016, 0)
+    assert not spike_f2.in_zone and game.bonus_score == 0
 
     # (g) in_zone reset by rewind
     game, spike_g, hb = make_nm_game()
@@ -927,9 +952,12 @@ def test_scoring_and_visuals(tmp_path: Path) -> None:
     assert game.total_score >= last_total
 
     # Difficulty calculation height only
-    g1, g2 = make_game(score=200), make_game(score=200)
-    g2.bonus_score = 10000
-    assert (g1.score - settings.SPIKE_START_SCORE) == (g2.score - settings.SPIKE_START_SCORE)
+    g_diff = make_game(score=0, hazards=False, specials=False, orbs=False)
+    g_diff.bonus_score = 10000
+    init_p = len(g_diff.platforms)
+    g_diff.camera_y -= 500
+    g_diff._generate_platforms()
+    assert g_diff.platforms[init_p].width == PLATFORM_START_WIDTH
 
     temp_save = tmp_path / "temp_score.json"
     game.best_score = 300
