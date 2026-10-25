@@ -6,8 +6,7 @@ A vertical neon platform jumper with reachability-guaranteed procedural generati
 [![Pygame](https://img.shields.io/badge/pygame-2.5+-green.svg)](https://www.pygame.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!-- Add a screenshot or animated GIF named docs/gameplay.png -->
-![Gameplay](docs/gameplay.png)
+<!-- Gameplay screenshot asset: docs/gameplay.png (to be added) -->
 
 ## About
 
@@ -66,7 +65,7 @@ python main.py
 | **Menu** | `Space` or `Enter` | Start run |
 | **Menu** | `ESC` | Quit game |
 | **Menu** | Mouse Left Click on **PLAY** | Start run |
-| **Paused** | `Space`, `Enter`, or `ESC` | Resume game |
+| **Paused** | `Space`, `Enter`, `ESC`, or `P` | Resume game |
 | **Paused** | Mouse Left Click on buttons | **RESUME**, **RESTART**, or return to **MENU** |
 | **Game Over** | `Space` or `Enter` | Play again |
 | **Game Over** | `ESC` | Return to menu |
@@ -161,22 +160,23 @@ Run the automated test suite with:
 .venv/bin/python test_game.py
 ```
 
-The test suite contains 38 comprehensive tests covering:
-- Bounded Stack operations and eviction invariants.
+The test suite contains 22 comprehensive test suites covering:
+- Bounded Stack operations, capacity bounds, and eviction invariants.
 - Analytical reachability proofs across 10,000+ generated platforms.
-- Collision detection, bounce mechanics, and wrap-around boundaries.
+- Collision detection, one-way platform landings, and wrap-around boundaries.
 - Score monotonicity, bonus accumulation, and isolated high-score serialization.
-- Hazard and special platform progression, fairness guarantees, and near-miss logic.
-- Second Chance rewind state, empty-stack fallbacks, route preservation, and headless HUD rendering.
+- Hazard progression, fairness guarantees, and near-miss bonus mechanics.
+- Bounce pad boosts, crumbling platforms, route integrity, and intact crumbler restoration.
+- Second Chance rewind sequence, empty-stack fallbacks, and HUD pips.
 - A 20,000-frame automated AI stability soak test simulating complete gameplay runs.
 
-**Status**: `ALL TESTS PASSED SUCCESSFULLY! (38/38)`
+**Status**: `ALL TESTS PASSED SUCCESSFULLY!`
 
 ## Project structure
 
 ```text
 one-more-jump/
-├── docs/                 # Documentation assets (.gitkeep, gameplay screenshot)
+├── docs/                 # Documentation assets (.gitkeep)
 ├── .gitignore            # Git exclusions (.venv, caches, highscore.json)
 ├── dsa.py                # Generic bounded LIFO Stack data structure
 ├── game.py               # Core game simulation, physics, generation, and rewind
@@ -187,7 +187,7 @@ one-more-jump/
 ├── renderer.py           # Pygame rendering, HUD, animations, and sound synth
 ├── requirements.txt      # Python dependencies (pygame>=2.5)
 ├── settings.py           # Centralized gameplay constants and derived physics
-└── test_game.py          # 38-test automated test suite and headless soak runner
+└── test_game.py          # 22-test automated test suite and headless soak runner
 ```
 
 ## Troubleshooting
