@@ -58,33 +58,22 @@ from settings import (
 )
 
 # --- Button Layout Geometry (Shared with main.py for hit-testing) ---
-
-def get_menu_play_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 400, 220, 52)
-
-
-def get_hud_pause_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 44) // 2, 14, 44, 32)
-
-
-def get_pause_resume_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 280, 200, 50)
+BUTTONS = {
+    "play": pygame.Rect((WIDTH - 220) // 2, 400, 220, 52),
+    "pause": pygame.Rect((WIDTH - 44) // 2, 14, 44, 32),
+    "resume": pygame.Rect((WIDTH - 200) // 2, 280, 200, 50),
+    "restart": pygame.Rect((WIDTH - 200) // 2, 348, 200, 50),
+    "menu": pygame.Rect((WIDTH - 200) // 2, 416, 200, 50),
+    "go_menu": pygame.Rect((WIDTH - 220) // 2, 468, 220, 52),
+}
 
 
-def get_pause_restart_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 348, 200, 50)
-
-
-def get_pause_menu_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 200) // 2, 416, 200, 50)
-
-
-def get_game_over_restart_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 400, 220, 52)
-
-
-def get_game_over_menu_button_rect() -> pygame.Rect:
-    return pygame.Rect((WIDTH - 220) // 2, 468, 220, 52)
+def _fade_to_bg(color: Tuple[int, int, int], ratio: float) -> Tuple[int, int, int]:
+    return (
+        int(BG_COLOR[0] + (color[0] - BG_COLOR[0]) * ratio),
+        int(BG_COLOR[1] + (color[1] - BG_COLOR[1]) * ratio),
+        int(BG_COLOR[2] + (color[2] - BG_COLOR[2]) * ratio),
+    )
 
 
 class SoundManager:
@@ -110,48 +99,24 @@ class SoundManager:
                 self.available = False
                 return
 
-            self.jump_sound = self._make_sine_wave(
-                freq=587.33, duration=0.07, volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.pad_sound = self._make_sine_wave(
-                freq=880.0, duration=0.10, volume=0.25, sample_rate=freq, channels=channels
-            )
-            self.game_over_sound = self._make_sine_wave(
-                freq=174.61, duration=0.35, volume=0.28, sample_rate=freq, channels=channels
-            )
-            self.orb_sound = self._make_tones(
-                [(988.0, 0.06), (1319.0, 0.09)], volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.risk_orb_sound = self._make_tones(
-                [(988.0, 0.06), (1319.0, 0.06), (1760.0, 0.10)], volume=0.24, sample_rate=freq, channels=channels
-            )
-            self.near_miss_sound = self._make_tones(
-                [(523.25, 0.05), (783.99, 0.05), (1046.50, 0.08)], volume=0.22, sample_rate=freq, channels=channels
-            )
-            self.available = bool(
-                self.jump_sound and self.pad_sound and self.game_over_sound
-                and self.orb_sound and self.risk_orb_sound and self.near_miss_sound
-            )
+            sound_defs = {
+                "jump_sound": ([(587.33, 0.07)], 0.22),
+                "pad_sound": ([(880.0, 0.10)], 0.25),
+                "game_over_sound": ([(174.61, 0.35)], 0.28),
+                "orb_sound": ([(988.0, 0.06), (1319.0, 0.09)], 0.22),
+                "risk_orb_sound": ([(988.0, 0.06), (1319.0, 0.06), (1760.0, 0.10)], 0.24),
+                "near_miss_sound": ([(523.25, 0.05), (783.99, 0.05), (1046.50, 0.08)], 0.22),
+            }
+            for attr, (notes, vol) in sound_defs.items():
+                setattr(self, attr, self._make_tones(notes, vol, freq, channels))
+            self.available = all(getattr(self, attr) is not None for attr in sound_defs)
         except Exception:
             self.available = False
 
     def _make_sine_wave(
         self, freq: float, duration: float, volume: float, sample_rate: int, channels: int
     ) -> Optional[pygame.mixer.Sound]:
-        try:
-            num_samples = int(sample_rate * duration)
-            buffer = bytearray()
-            for i in range(num_samples):
-                t = i / sample_rate
-                # Exponential decay envelope
-                envelope = math.exp(-3.5 * t / duration)
-                sample = int(volume * 32767.0 * envelope * math.sin(2.0 * math.pi * freq * t))
-                sample_bytes = int(sample).to_bytes(2, byteorder="little", signed=True)
-                # Write sample once per channel (e.g. duplicate for stereo)
-                buffer += sample_bytes * channels
-            return pygame.mixer.Sound(buffer=bytes(buffer))
-        except Exception:
-            return None
+        return self._make_tones([(freq, duration)], volume, sample_rate, channels)
 
     def _make_tones(
         self, notes: List[Tuple[float, float]], volume: float, sample_rate: int, channels: int
@@ -171,41 +136,27 @@ class SoundManager:
         except Exception:
             return None
 
-    def play_jump(self) -> None:
-        if self.available and self.jump_sound:
+    def _play(self, sound: Optional[pygame.mixer.Sound]) -> None:
+        if self.available and sound:
             try:
-                self.jump_sound.play()
+                sound.play()
             except Exception:
                 pass
+
+    def play_jump(self) -> None:
+        self._play(self.jump_sound)
 
     def play_pad(self) -> None:
-        if self.available and self.pad_sound:
-            try:
-                self.pad_sound.play()
-            except Exception:
-                pass
+        self._play(self.pad_sound)
 
     def play_game_over(self) -> None:
-        if self.available and self.game_over_sound:
-            try:
-                self.game_over_sound.play()
-            except Exception:
-                pass
+        self._play(self.game_over_sound)
 
     def play_orb(self, risk: bool = False) -> None:
-        try:
-            snd = self.risk_orb_sound if risk else self.orb_sound
-            if self.available and snd:
-                snd.play()
-        except Exception:
-            pass
+        self._play(self.risk_orb_sound if risk else self.orb_sound)
 
     def play_near_miss(self) -> None:
-        try:
-            if self.available and self.near_miss_sound:
-                self.near_miss_sound.play()
-        except Exception:
-            pass
+        self._play(self.near_miss_sound)
 
 
 class Renderer:
@@ -324,19 +275,16 @@ class Renderer:
 
     def _update_fx(self, dt: float) -> None:
         """Advance visual effects lifetimes and particle physics."""
-        for r in self.rings:
-            r["age"] += dt
+        for item in self.rings + self.popups:
+            item["age"] += dt
         self.rings = [r for r in self.rings if r["age"] < r["duration"]]
+        self.popups = [pop for pop in self.popups if pop["age"] < pop["duration"]]
 
         for p in self.particles_fx:
             p["age"] += dt
             p["x"] += p["vx"] * dt
             p["y"] += p["vy"] * dt
         self.particles_fx = [p for p in self.particles_fx if p["age"] < p["duration"]]
-
-        for pop in self.popups:
-            pop["age"] += dt
-        self.popups = [pop for pop in self.popups if pop["age"] < pop["duration"]]
 
     def render(self, game: Game, mouse_pos: Tuple[int, int], dt: float) -> None:
         """Render current game state based on active game mode."""
@@ -554,12 +502,7 @@ class Renderer:
             t = d.age
             if t >= DEBRIS_DURATION:
                 continue
-            fade = max(0.0, 1.0 - (t / DEBRIS_DURATION))
-            color = (
-                int(BG_COLOR[0] + (CRUMBLE_COLOR[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (CRUMBLE_COLOR[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (CRUMBLE_COLOR[2] - BG_COLOR[2]) * fade),
-            )
+            color = _fade_to_bg(CRUMBLE_COLOR, max(0.0, 1.0 - (t / DEBRIS_DURATION)))
             drop_y = int(0.5 * 1400.0 * (t ** 2))
             screen_y = int(d.rect.top - game.camera_y) + drop_y
             if screen_y > HEIGHT + 40 or screen_y < -50:
@@ -628,66 +571,39 @@ class Renderer:
 
     def _render_effects(self, camera_y: float) -> None:
         """Render visual effect rings, burst particles, and rising text popups."""
-        # Draw expanding rings
         for r in self.rings:
             progress = r["age"] / r["duration"]
             radius = int(r["radius_start"] + progress * (r["radius_end"] - r["radius_start"]))
-            fade = max(0.0, 1.0 - progress)
-            base_c = r["color"]
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * fade),
-            )
+            c = _fade_to_bg(r["color"], max(0.0, 1.0 - progress))
             screen_y = int(r["y"] - camera_y)
             if -50 <= screen_y <= HEIGHT + 50:
                 pygame.draw.circle(self.screen, c, (int(r["x"]), screen_y), radius, width=2)
 
-        # Draw burst particles
         for p in self.particles_fx:
             progress = p["age"] / p["duration"]
-            fade = max(0.0, 1.0 - progress)
-            base_c = p["color"]
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * fade),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * fade),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * fade),
-            )
+            c = _fade_to_bg(p["color"], max(0.0, 1.0 - progress))
             cur_size = max(1, int(p["size"] * (1.0 - progress * 0.5)))
             screen_y = int(p["y"] - camera_y)
             if -20 <= screen_y <= HEIGHT + 20:
                 pygame.draw.circle(self.screen, c, (int(p["x"]), screen_y), cur_size)
 
-        # Draw popups
         for pop in self.popups:
             progress = pop["age"] / pop["duration"]
-            fade = max(0.0, 1.0 - progress)
             rise = 40.0 * (1.0 - (1.0 - progress) ** 2)
             screen_y = int(pop["y"] - camera_y - rise)
             if screen_y < -50 or screen_y > HEIGHT + 50:
                 continue
 
-            base_c = pop["base_color"]
-            fade_step = int(fade * 10)
-            ratio = fade_step / 10.0
-            c = (
-                int(BG_COLOR[0] + (base_c[0] - BG_COLOR[0]) * ratio),
-                int(BG_COLOR[1] + (base_c[1] - BG_COLOR[1]) * ratio),
-                int(BG_COLOR[2] + (base_c[2] - BG_COLOR[2]) * ratio),
-            )
-
-            size = "small"
-            if pop["is_near_miss"]:
-                size = "large" if pop["age"] < 0.12 else "medium"
-
+            fade = max(0.0, 1.0 - progress)
+            c = _fade_to_bg(pop["base_color"], int(fade * 10) / 10.0)
+            size = ("large" if pop["age"] < 0.12 else "medium") if pop["is_near_miss"] else "small"
             key = (pop["text"], c, size)
             if key not in self.text_cache:
                 font = self.font_score if size == "large" else (self.font_medium if size == "medium" else self.font_small)
                 self.text_cache[key] = font.render(pop["text"], True, c)
 
             surf = self.text_cache[key]
-            rect = surf.get_rect(center=(int(pop["x"]), screen_y))
-            self.screen.blit(surf, rect)
+            self.screen.blit(surf, surf.get_rect(center=(int(pop["x"]), screen_y)))
 
     def _render_player(self, game: Game) -> None:
         """Render character with landing squash and ascending stretch animations."""
@@ -763,9 +679,8 @@ class Renderer:
         self.screen.blit(best_label, (WIDTH - best_label.get_width() - 20, 20))
 
         # Top-center Pause Button
-        pause_btn = get_hud_pause_button_rect()
-        hovered = pause_btn.collidepoint(mouse_pos)
-        self.draw_button(self.screen, pause_btn, "||", hovered)
+        pause_btn = BUTTONS["pause"]
+        self.draw_button(self.screen, pause_btn, "||", pause_btn.collidepoint(mouse_pos))
 
         # Checkpoint Rewind Indicator (Second Chance Pips)
         pips_y = HEIGHT - 28
@@ -799,7 +714,7 @@ class Renderer:
         self.screen.blit(best_surf, best_rect)
 
         # Play Button
-        play_btn = get_menu_play_button_rect()
+        play_btn = BUTTONS["play"]
         self.draw_button(self.screen, play_btn, "PLAY", play_btn.collidepoint(mouse_pos))
 
         # Controls Guide
@@ -817,13 +732,9 @@ class Renderer:
         title = self.font_title.render("PAUSED", True, TEXT_COLOR)
         self.screen.blit(title, title.get_rect(center=(WIDTH // 2, 210)))
 
-        resume_btn = get_pause_resume_button_rect()
-        restart_btn = get_pause_restart_button_rect()
-        menu_btn = get_pause_menu_button_rect()
-
-        self.draw_button(self.screen, resume_btn, "RESUME", resume_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, restart_btn, "RESTART", restart_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, menu_btn, "MENU", menu_btn.collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["resume"], "RESUME", BUTTONS["resume"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["restart"], "RESTART", BUTTONS["restart"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["menu"], "MENU", BUTTONS["menu"].collidepoint(mouse_pos))
 
     def _render_game_over(self, game: Game, mouse_pos: Tuple[int, int]) -> None:
         """Render game over screen with scores, new best highlight, and buttons."""
@@ -844,8 +755,5 @@ class Renderer:
             best_text = self.font_medium.render(f"BEST: {game.best_score}", True, TEXT_MUTED)
         self.screen.blit(best_text, best_text.get_rect(center=(WIDTH // 2, 312)))
 
-        restart_btn = get_game_over_restart_button_rect()
-        menu_btn = get_game_over_menu_button_rect()
-
-        self.draw_button(self.screen, restart_btn, "PLAY AGAIN", restart_btn.collidepoint(mouse_pos))
-        self.draw_button(self.screen, menu_btn, "MENU", menu_btn.collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["play"], "PLAY AGAIN", BUTTONS["play"].collidepoint(mouse_pos))
+        self.draw_button(self.screen, BUTTONS["go_menu"], "MENU", BUTTONS["go_menu"].collidepoint(mouse_pos))

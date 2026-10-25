@@ -29,7 +29,6 @@ BUTTON_BG = (22, 32, 68)           # Unhovered button background
 BUTTON_HOVER_BG = (42, 60, 120)    # Hovered button background
 BUTTON_BORDER = (50, 200, 210)     # Button neon border
 BUTTON_HOVER_BORDER = (255, 100, 160) # Button neon hover border
-OVERLAY_COLOR = (11, 16, 38)       # Translucent overlay RGB (alpha blended in code)
 FLASH_COLOR = (34, 230, 212)       # Cyan flash on checkpoint rewind
 HAZARD_COLOR = ACCENT_COLOR        # Radiant neon pink for hazards and spikes
 HAZARD_GLOW_COLOR = (120, 25, 70)  # Darker magenta glow for hazard backdrop

@@ -172,63 +172,25 @@ class Game:
     def __init__(self) -> None:
         self.state: str = "menu"  # "menu", "playing", "paused", "game_over"
         self.best_score: int = load_highscore()
-        self.score: int = 0
-        self.bonus_score: int = 0
-        self.max_height_y: float = 0.0
-        self.start_y: float = float(START_Y)
-        self.camera_y: float = 0.0
-
-        # Player entity physics
-        self.player_x: float = float(START_X)
-        self.player_y: float = float(START_Y)
-        self.player_vx: float = 0.0
-        self.player_vy: float = 0.0
+        self.run_id: int = 0
         self.player_width: int = PLAYER_SIZE
         self.player_height: int = PLAYER_SIZE
-
-        # Visual feedback timers and sound trigger flags
-        self.squash_timer: float = 0.0
-        self.rewind_flash_timer: float = 0.0
-        self.just_jumped: bool = False
-        self.just_boosted: bool = False
-        self.just_game_over: bool = False
-
-        # Hazards and obstacles state (stationary spike strips)
-        self.hazards: List[Hazard] = []
-        self.invuln_timer: float = 0.0
-        self.platforms_since_hazard: int = 0
         self.hazards_enabled: bool = True
-
-        # Specials state (bounce pads, crumblers, debris)
+        self.specials_enabled: bool = True
+        self.orbs_enabled: bool = True
+        self.hazards: List[Hazard] = []
         self.pads: List[Pad] = []
         self.crumblers: List[Crumbler] = []
         self.debris: List[Debris] = []
-        self.platforms_since_pad: int = 999
-        self.platforms_since_crumbler: int = 999
-        self.consecutive_special_run: int = 0
-        self.specials_enabled: bool = True
-
-        # Collectible bonus orbs and event queue
         self.orbs: List[Orb] = []
         self.events: List[tuple] = []
-        self.orbs_enabled: bool = True
-        self.last_landing_platform: Optional[Platform] = None
-
-        # Chosen as a simple container; linear scan is fine for a few dozen platforms.
         self.platforms: List[Platform] = []
-
-        # =========================================================================
-        # Checkpoint System (DSA Demonstration: LIFO Stack)
-        # The checkpoint stack operates on Last-In, First-Out (LIFO) semantics:
-        # The most recently saved platform is the first one restored upon a fall.
-        # Checkpoints store only platform rect coordinates (x, y, w, h).
-        # Capacity is bounded to STACK_CAPACITY; older checkpoints are discarded.
-        # =========================================================================
         self.checkpoint_stack: Stack[Tuple[int, int, int, int]] = Stack(STACK_CAPACITY)
         self.last_checkpoint_top_y: float = float("inf")
         self.last_safe_platform: Optional[Platform] = None
-        self.chances: int = CHANCES_PER_RUN
-        self.run_id: int = 0
+        self._reset_run_state()
+        self.player_vy = 0.0
+        self.camera_y = 0.0
 
     @property
     def total_score(self) -> int:
@@ -237,34 +199,21 @@ class Game:
 
     def _platform_has_spikes(self, platform: Platform) -> bool:
         """Check whether a given platform carries a spike hazard."""
-        for h in self.hazards:
-            if h.platform == platform:
-                return True
-        return False
+        return any(h.platform == platform for h in self.hazards)
 
     def _platform_has_pad(self, platform: Platform) -> Optional[Pad]:
         """Return the bounce pad on this platform if one exists."""
-        for pad in self.pads:
-            if pad.platform == platform:
-                return pad
-        return None
+        return next((pad for pad in self.pads if pad.platform == platform), None)
 
     def _get_crumbler(self, platform: Platform) -> Optional[Crumbler]:
         """Return the crumbler record for this platform if one exists."""
-        for c in self.crumblers:
-            if c.platform is platform:
-                return c
-        return None
+        return next((c for c in self.crumblers if c.platform is platform), None)
 
     def _is_plain(self, platform: Platform) -> bool:
         """Check whether platform is plain (no spikes, no bounce pad, not a crumbler)."""
-        if self._platform_has_spikes(platform):
-            return False
-        if any(pad.platform == platform for pad in self.pads):
-            return False
-        if any(c.platform is platform for c in self.crumblers):
-            return False
-        return True
+        return not (self._platform_has_spikes(platform) or 
+                    any(p.platform == platform for p in self.pads) or 
+                    any(c.platform is platform for c in self.crumblers))
 
     def _circle_overlaps_rect(self, cx: float, cy: float, r: float, rect: pygame.Rect) -> bool:
         """Check whether a circle overlaps a rectangular region."""
@@ -285,17 +234,22 @@ class Game:
                 return False
         return True
 
-    def start_run(self) -> None:
-        """Initialize a new game run with reset physics, camera, and stack."""
-        self.run_id += 1
-        self.state = "playing"
+    def _make_start_platform(self) -> Platform:
+        """Construct the initial safe platform positioned directly under the player."""
+        start_plat_width = 140
+        start_plat_x = (WIDTH - start_plat_width) // 2
+        start_plat_y = int(START_Y + PLAYER_SIZE + 2)
+        return Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+
+    def _reset_run_state(self) -> None:
+        """Reset mutable simulation variables for a new run without generating platforms."""
         self.score = 0
         self.bonus_score = 0
         self.chances = CHANCES_PER_RUN
         self.player_x = float(START_X)
         self.player_y = float(START_Y)
         self.player_vx = 0.0
-        self.player_vy = JUMP_VELOCITY  # Initial upward bounce
+        self.player_vy = JUMP_VELOCITY
         self.start_y = float(START_Y)
         self.max_height_y = float(START_Y)
         self.camera_y = float(START_Y - (HEIGHT * CAMERA_THRESHOLD_RATIO))
@@ -309,8 +263,6 @@ class Game:
         self.hazards.clear()
         self.invuln_timer = 0.0
         self.platforms_since_hazard = 0
-        if not hasattr(self, "hazards_enabled"):
-            self.hazards_enabled = True
 
         self.pads.clear()
         self.crumblers.clear()
@@ -318,23 +270,20 @@ class Game:
         self.platforms_since_pad = 999
         self.platforms_since_crumbler = 999
         self.consecutive_special_run = 0
-        if not hasattr(self, "specials_enabled"):
-            self.specials_enabled = True
 
         self.orbs.clear()
         self.events.clear()
-        if not hasattr(self, "orbs_enabled"):
-            self.orbs_enabled = True
         self.last_landing_platform = None
-
         self.checkpoint_stack.clear()
 
-        # Seed initial safe platform directly under the player
-        start_plat_width = 140
-        start_plat_x = (WIDTH - start_plat_width) // 2
-        start_plat_y = int(START_Y + PLAYER_SIZE + 2)
-        start_plat = Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+    def start_run(self) -> None:
+        """Initialize a new game run with reset physics, camera, and stack."""
+        self.run_id += 1
+        self.state = "playing"
+        self._reset_run_state()
 
+        # Seed initial safe platform directly under the player
+        start_plat = self._make_start_platform()
         self.platforms = [start_plat]
         self.last_safe_platform = start_plat
         self.last_checkpoint_top_y = float(start_plat.top)
@@ -606,10 +555,7 @@ class Game:
             candidates = [p for p in self.platforms if p.top < self.camera_y + HEIGHT]
             cp_platform = max(candidates, key=lambda p: p.top) if candidates else self.platforms[0]
         else:
-            start_plat_width = 140
-            start_plat_x = (WIDTH - start_plat_width) // 2
-            start_plat_y = int(START_Y + PLAYER_SIZE + 2)
-            cp_platform = Platform(start_plat_x, start_plat_y, start_plat_width, PLATFORM_HEIGHT)
+            cp_platform = self._make_start_platform()
 
         # a. Ensure checkpoint platform exists in platforms list (re-append if culled)
         if cp_platform not in self.platforms:
