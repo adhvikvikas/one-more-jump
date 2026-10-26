@@ -192,7 +192,7 @@ one-more-jump/
 
 ## Troubleshooting
 
-- **`ModuleNotFoundError: No module named 'pygame'`**: The virtual environment is either inactive or missing dependencies. Run `source .venv/bin/activate` (or `.venv\Scripts\Activate.ps1` on Windows) and run `pip install -r requirements.txt`.
+-   **`ModuleNotFoundError: No module named 'pygame'`**: The virtual environment is either inactive or missing dependencies. Run `source .venv/bin/activate` (or `.venv\Scripts\Activate.ps1` on Windows) and run `pip install -r requirements.txt`.
 - **No audio plays**: `pygame.mixer` could not find an available output device. The game safely catches audio initialization errors and runs in silent mode without crashing.
 - **Window fails to open on macOS**: Ensure you are launching with the virtual environment's Python binary (`.venv/bin/python main.py`) to ensure proper framework access for GUI windows.
 - **Resetting high score**: Remove the `highscore.json` file in the project root (`rm highscore.json`). A clean file will be re-created upon your next game over.
