@@ -170,7 +170,7 @@ The test suite contains 22 comprehensive test suites covering:
 - Second Chance rewind sequence, empty-stack fallbacks, and HUD pips.
 - A 20,000-frame automated AI stability soak test simulating complete gameplay runs.
 
-**Status**: `ALL TESTS PASSED SUCCESSFULLY!`
+**Status**: `ALL TESTS PASSED SUCCESSFULLY!` 
 
 ## Project structure
 
